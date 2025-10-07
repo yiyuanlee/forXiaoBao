@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>线上寻宝游戏</title>
+  <style>
+    html,body{margin:0;padding:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";background:#0f1220;color:#f6f7fb}
+    .wrap{max-width:840px;margin:0 auto;padding:32px 20px}
+    .card{background:#14182b;border:1px solid #232847;border-radius:16px;padding:20px;margin:16px 0;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    h1{font-size:28px;margin:0 0 8px}
+    h2{font-size:20px;margin:8px 0 12px;color:#c9d1ff}
+    .meta{opacity:.8;font-size:14px;margin-bottom:12px}
+    .riddle{font-size:18px;line-height:1.6}
+    input[type=text]{width:100%;padding:12px 14px;border-radius:10px;border:1px solid #31365a;background:#0f1220;color:#e8ebff;outline:none}
+    button{margin-top:10px;padding:10px 16px;border-radius:10px;border:0;background:#6a6ff5;color:white;font-weight:600;cursor:pointer}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .ok{color:#3ddc97;font-weight:600}
+    .bad{color:#ff6b6b}
+    .hint{opacity:.85;font-size:14px;margin-top:8px}
+    .stage{display:none}
+    .stage.active{display:block}
+    .footer{opacity:.7;font-size:12px;text-align:center;margin-top:24px}
+    code,pre{background:#0c0f1e;border:1px solid #232847;border-radius:8px;padding:12px;display:block;overflow:auto}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    a{color:#9ab0ff}
+    .tag{display:inline-block;background:#232847;border:1px solid #2e355c;color:#dfe3ff;border-radius:999px;padding:2px 10px;font-size:12px;margin-right:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>🎉小宝线上寻宝游戏</h1>
+      <div class="meta">规则：每关输入正确答案才能解锁下一关。答案不区分中英文大小写，注意去掉空格。</div>
+      <div class="meta">Tips：如果你在某一关卡卡住了，可以尝试刷新页面重新开始。</div>
+    </div>
+
+    <div id="game"></div>
+
+    <div class="footer">Made with ❤️ </div>
+  </div>
+
+<script>
+/**
+ * 你可以在这里轻松自定义关卡：
+ * - text: 题面
+ * - answer: 正确答案（数组中任一匹配即可）
+ * - hint: 提示（可选）
+ * - joke: 过关后显示的彩蛋吐槽（可选）
+ */
+const STAGES = [
+  {
+    text: "第1关：谁是世界上最伟大的球队～？",
+    answer: ["曼联","曼彻斯特联","Manchester United","manchester united","manu","曼联队"],
+    hint: "提示：这题不需要提示",
+    joke: "答对啦！感情曲线已经突破天际线📈。"
+  },
+  {
+    text: "第2关：今天是我们在一起多少天？（格式：数字+天，例如：100天）",
+    answer: ["500天","五百天","500","五百"],
+    hint: "提示：这个达不对罚款500元哦～",
+    joke: "bb厉害！"
+  },
+  {
+    text: "第3关：我最常说的口头禅是？（例如：'bb我饿了' / 'bb我睡觉' / 'bb冲鸭'）",
+    answer: ["bb我困了"],
+    hint: "提示：你是不是已经在模仿我说话了？",
+    joke: "原来我每次都被你偷偷记住了嘻嘻"
+  },
+  {
+    text: "第4关：我多高？",
+    answer: ["179","178","177","180","176"],
+    hint: "",
+    joke: "输入172扣5分"
+  },
+  {
+    text: "第5关：最后一题！ 谁要给对方买去旅游的机票？",
+    answer: ["我","姜神","Minnie","姜若忻"],
+    hint: "",
+    joke: "答对了！bb聪明！"
+  }
+];
+
+// 你也可以将答案改成你们的专属关键词，上面的默认只是“搞笑通用版”。
+
+const $game = document.getElementById('game');
+
+function createStage(i, total){
+  const s = STAGES[i];
+  const el = document.createElement('div');
+  el.className = 'card stage' + (i===0?' active':'');
+
+  el.innerHTML = `
+    <h2>关卡 ${i+1} / ${total}</h2>
+    <div class="riddle">${s.text}</div>
+    <input type="text" placeholder="在此输入答案…"/>
+    <button>提交</button>
+    <div class="msg"></div>
+    ${s.hint ? `<div class="hint">💡 ${s.hint}</div>` : ''}
+  `;
+
+  const input = el.querySelector('input');
+  const btn = el.querySelector('button');
+  const msg = el.querySelector('.msg');
+
+  function normalize(t){
+    return (t||'').toLowerCase().replace(/\s+/g, '').trim();
+  }
+
+  btn.addEventListener('click', () => {
+    const val = normalize(input.value);
+    const ok = (s.answer||[]).some(ans => normalize(ans) === val);
+    if(ok){
+      msg.innerHTML = `<span class="ok">✅ 正确！</span> ${s.joke ? s.joke : ''}`;
+      btn.disabled = true;
+      input.disabled = true;
+      setTimeout(()=>{
+        el.classList.remove('active');
+        if(i+1 < total){
+          document.querySelectorAll('.stage')[i+1].classList.add('active');
+        }else{
+          showFinal();
+        }
+      }, 600);
+    }else{
+      msg.innerHTML = `<span class="bad">❌ 再想想！</span>`;
+    }
+  });
+
+  return el;
+}
+
+function showFinal(){
+  // 1) 先创建并插入终点卡片（不在 innerHTML 里放 <script>）
+  const final = document.createElement('div');
+  final.className = 'card stage active';
+  final.innerHTML = `
+    <h2>🎁 终极礼物 · 爱心动画</h2>
+    <pre id="heart" style="font-family: monospace; line-height: 1em; font-size: 14px; white-space: pre; color:#ff5e9c;"></pre>
+  `;
+  $game.appendChild(final);
+
+  // 2) 然后用脚本生成并逐行打印爱心（此时 DOM 已就绪）
+  const heart = final.querySelector('#heart');
+  const lines = [];
+  for (let y = 15; y >= -15; y--) {
+    let row = '';
+    for (let x = -30; x < 30; x++) {
+      const X = x * 0.04, Y = y * 0.1;
+      const expr = X * X + Y * Y - 1;
+      row += (Math.pow(expr, 3) - X * X * Math.pow(Y, 3) <= 0) ? '❤' : ' ';
+    }
+    lines.push(row);
+  }
+
+  let i = 0;
+  (function printLine(){
+    if (i < lines.length) {
+      heart.textContent += lines[i++] + '\n';
+      setTimeout(printLine, 50); // 打字机效果
+    } else {
+      heart.textContent += "\nFrom me to you. 一百天快乐小宝 ❤️";
+    }
+  })();
+}
+
+(function init(){
+  STAGES.forEach((_, i) => $game.appendChild(createStage(i, STAGES.length)));
+})();
+</script>
+</body>
+</html>
